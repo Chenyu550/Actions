@@ -1,8 +1,12 @@
-name: Build Node 24 for Windows 7 (experimental)
+name: Daily Node 24 Windows 7 releases
 
 on:
+  schedule:
+    # 01:00 UTC = 09:00 Asia/Singapore, once per day.
+    - cron: '0 1 * * *'
   workflow_dispatch:
   push:
+    branches: [main]
     paths:
       - '.github/workflows/build-node24-win7.yml'
       - 'patches/**'
@@ -13,20 +17,45 @@ permissions:
   contents: read
 
 concurrency:
-  group: node24-win7-${{ github.ref }}
+  group: node24-win7-release
   cancel-in-progress: false
 
 jobs:
+  check:
+    name: Check for a newer stable Node 24 release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      needs_build: ${{ steps.version.outputs.needs_build }}
+      version: ${{ steps.version.outputs.version }}
+      node_commit: ${{ steps.version.outputs.node_commit }}
+      repository_version: ${{ steps.version.outputs.repository_version }}
+    steps:
+      - name: Check out this build repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Compare the official Node index with repository releases and tags
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/release.py check
+
   build:
-    name: Node v24.22.1 / x64 / MSI + ZIP
+    name: Node v${{ needs.check.outputs.version }} / x64 / MSI + ZIP + Release
+    needs: check
+    if: needs.check.outputs.needs_build == 'true'
     runs-on: windows-2022
     timeout-minutes: 360
+    permissions:
+      contents: write
     defaults:
       run:
         shell: pwsh
     env:
-      NODE_VERSION: '24.22.1'
-      NODE_COMMIT: 'ce7aaf1cee78b8cf0ce17364260535c418d3ed26'
+      NODE_VERSION: ${{ needs.check.outputs.version }}
+      NODE_COMMIT: ${{ needs.check.outputs.node_commit }}
       # WiX 4 tools target .NET 6; allow the runner's newer .NET runtime.
       DOTNET_ROLL_FORWARD: Major
       PYTHONUTF8: '1'
@@ -90,6 +119,11 @@ jobs:
 
       - name: Verify source and apply all five patches
         run: |
+          # Pin this build to the exact official release selected by the check job.
+          $manifest = Get-Content patches/manifest.json -Raw | ConvertFrom-Json
+          $manifest.node_version = $env:NODE_VERSION
+          $manifest.node_commit = $env:NODE_COMMIT
+          $manifest | ConvertTo-Json -Depth 10 | Set-Content patches/manifest.json -Encoding utf8
           python scripts/apply_patches.py --source node-src --report reports/build-info.json
           if ($LASTEXITCODE -ne 0) { throw 'Patch verification/application failed.' }
           git -C node-src diff --binary --output=../reports/applied.patch
@@ -132,11 +166,11 @@ jobs:
             'CI runs on Windows Server 2022. Windows 7 runtime and MSI installation are NOT verified by this workflow.',
             'Run node.exe smoke.cjs on a real Windows 7 SP1 x64 machine before relying on this build.') |
             Set-Content dist/COMPATIBILITY.txt -Encoding utf8
-          Get-ChildItem dist -File | Sort-Object Name | ForEach-Object {
+          Get-ChildItem dist -File | Where-Object { $_.Extension -in '.msi', '.zip' } | Sort-Object Name | ForEach-Object {
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $($_.Name)"
           } | Set-Content dist/SHASUMS256.txt -Encoding ascii
-          @('## Experimental Node v24.22.1 for Windows 7 SP1 x64',
+          @("## Experimental Node v$env:NODE_VERSION for Windows 7 SP1 x64",
             '',
             'Built: unsigned MSI installer and ZIP, with bundled npm/corepack.',
             '',
@@ -148,11 +182,19 @@ jobs:
       - name: Upload MSI, ZIP, and checksums
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: node-v24.22.1-win7-x64-experimental
+          name: node-v${{ env.NODE_VERSION }}-win7-x64-experimental
           path: dist/
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
+
+      - name: Publish MSI, ZIP, and checksums to GitHub Release
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python scripts/release.py publish --version $env:NODE_VERSION --directory dist
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release publication failed. Actions artifacts remain available.' }
 
       - name: Verify the uploaded ZIP and MSI payloads
         run: |

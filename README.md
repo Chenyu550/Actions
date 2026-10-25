@@ -1,87 +1,70 @@
-# Node.js v24.22.1：Windows 7 SP1 x64 实验构建
+# Node 24：Windows 7 x64 每日更新与自动发布
 
-把本包**全部内容**放进你自己的 GitHub 仓库根目录，保留隐藏的 `.github` 目录，然后进入 **Actions → Build Node 24 for Windows 7 (experimental) → Run workflow**。
+每天 **09:00（Asia/Singapore，UTC+8）**，GitHub Actions 检查官方 Node 分发索引中的最新 **24.x.x 正式版本**，与本仓库已有正式 Release/tag 的最高版本比较。
 
-工作流会检出官方 Node 源码，应用补丁，使用 VS 2022 自带的 ClangCL 编译，并生成 **MSI 安装包和 ZIP 便携包**。运行时独立于 Electron/VxKex；实际 Win7 兼容性须以真机测试为准。本次交付的是构建工程，交付时的验证范围见 `VALIDATION.md`。
+- 有更新：检出该版本的官方源码，应用 Win7 补丁，编译并发布 MSI、ZIP 和 SHA-256 文件。
+- 没有更新：检查后直接结束，Windows 构建任务显示 `skipped`，不重新编译。
+- 排除 RC、nightly、其他主版本及草稿/预发布 Release；按数字比较版本，而不是按字符串或发布时间排序。
+- 你已创建的 `24.20.0` Release 和 tag 会作为现有版本保留，不重复创建或覆盖。
 
-## 下载编译结果
+## 触发与执行顺序
 
-安装包上传完成后，在该次 Actions 页的 **Artifacts** 下载 `node-v24.22.1-win7-x64-experimental`。工作流先编译打包并上传，再进行程序与包内容校验；无需等待校验结束，后续校验失败也可以下载。解开 artifact 后得到：
+工作流名称：**Daily Node 24 Windows 7 releases**。除每日定时外，也可以在 **Actions → Run workflow** 手动检查；相关工作流、脚本、补丁更新时也会触发同样的检查。
 
-| 文件 | 用途 |
+执行顺序：
+
+1. 在轻量 Linux 任务中比较官方版本与本仓库 Release/tag。
+2. 仅在有更新时启动 Windows 2022 构建，锁定官方 tag 对应的确切源码提交。
+3. 校验补丁摘要并应用补丁，编译 `node.exe`、MSI，打包 ZIP。
+4. 先上传 Actions artifact，再把 MSI、ZIP、SHA-256 文件上传到 GitHub Release。
+5. 最后执行原有包内校验；校验失败也不会撤回已上传的安装包。
+
+同一仓库的发布流程串行执行，避免重复构建/发布同一个版本。新 tag 沿用 `24.20.0` 的命名方式，例如 `24.22.1`，指向生成该发布的工作流源码提交；官方 Node 源码提交另写入发布说明和构建记录。
+
+发布先作为本工作流的草稿创建，三个文件上传完成后才正式发布。已发布的版本不覆盖；上传中断留下的本工作流草稿可在重试时恢复，不会修改无关草稿。
+
+## 下载文件
+
+优先从本仓库的 [GitHub Releases](https://github.com/Chenyu550/Actions/releases) 下载：
+
+| 文件 | 内容 |
 | --- | --- |
-| `node-v24.22.1-win7-x64.msi` | 未签名的 x64 安装包，包含 npm、npx、Corepack 和安装界面 |
-| `node-v24.22.1-win7-x64.zip` | 便携包，包含 `node.exe`、npm、npx、Corepack 和许可证 |
-| `SHASUMS256.txt` | 顶层文件的 SHA-256 校验值 |
-| `build-info.json`、`applied.patch` | 固定源码/补丁版本、校验值和实际应用的源码改动 |
-| `smoke.cjs`、`fixtures/` | 可在 Win7 上再次运行的功能测试 |
-| `COMPATIBILITY.txt` | 当前验证范围 |
+| `node-v24.x.x-win7-x64.msi` | 未签名的 x64 安装包，包含 npm、npx、Corepack |
+| `node-v24.x.x-win7-x64.zip` | 便携包，包含 Node、npm、npx、Corepack 和许可证 |
+| `SHASUMS256.txt` | MSI 和 ZIP 的 SHA-256 校验值 |
 
-另一个 artifact `node24-win7-reports` 保存导入表、测试输出、MSI 解包日志；检查失败时也会上传已有报告。安装包提前上传并不代表验证通过，请同时查看运行结果。没有自动创建 GitHub Release。
+Actions 中的 `node-v24.x.x-win7-x64-experimental` artifact 还包含 `build-info.json`、`applied.patch`、Win7 手动检查脚本与说明。`node24-win7-reports` artifact 保存导入表、包内运行输出和 MSI 解包日志，失败时也上传已有报告。
 
-ZIP 内的目录沿用上游名称 `node-v24.22.1-win-x64`。程序报告的版本仍是 `v24.22.1`，未修改 Node 模块 ABI，也未替换 V8、OpenSSL 等依赖的版本。
+安装包是在运行校验之前上传的，请同时查看对应工作流的后续结果。Windows 2022 上通过校验不等于已验证 Win7 真机兼容性。
 
-## 实际应用的补丁
+## 补丁与源码锁定
 
-前三份文件来自 [Electron-for-windows-7 的 v44.2.0 补丁目录](https://github.com/e3kskoy7wqk/Electron-for-windows-7/tree/1086a0a7c6b7105f300a4af8724e6d996ce3c347/v44.2.0/third_party/electron_node)，保留原始字节，并在 `patches/manifest.json` 记录来源和 SHA-256。
+前三份补丁来自 [Electron-for-windows-7 的 v44.2.0 补丁目录](https://github.com/e3kskoy7wqk/Electron-for-windows-7/tree/1086a0a7c6b7105f300a4af8724e6d996ce3c347/v44.2.0/third_party/electron_node)，保留原始字节；来源与 SHA-256 记录在 `patches/manifest.json`。
 
 | 补丁 | 作用 |
 | --- | --- |
-| `0001-libuv-hostname.patch` | 为 Win7 缺少的 `GetHostNameW` 提供回退 |
-| `0002-libuv-realtime-clock.patch` | 动态查找精确时钟 API，缺少时使用 `GetSystemTimeAsFileTime` |
+| `0001-libuv-hostname.patch` | 缺少 `GetHostNameW` 时使用回退实现 |
+| `0002-libuv-realtime-clock.patch` | 缺少精确时钟 API 时使用 `GetSystemTimeAsFileTime` |
 | `0003-libuv-process-title.patch` | 防止进程标题为空时继续读取 |
-| `0004-node-and-msi-platform-check.patch` | 将 Node 启动检查和 MSI 安装条件改为 Win7 SP1 起，标明社区构建 |
-| `0005-v8-waitable-timer-fallback.patch` | 高精度计时器标志不受支持时，重试普通计时器 |
+| `0004-node-and-msi-platform-check.patch` | Node 启动和 MSI 安装条件改为 Win7 SP1 起，标明社区构建 |
+| `0005-v8-waitable-timer-fallback.patch` | 高精度计时器标志不支持时重试普通计时器 |
 
-Node 来源：[nodejs/node v24.22.1](https://github.com/nodejs/node/tree/v24.22.1)，固定提交 `ce7aaf1cee78b8cf0ce17364260535c418d3ed26`。
+仓库清单记录补丁基线；每次任务根据官方正式 tag，在工作区中更新本次构建的 Node 版本和源码 SHA，不提交回仓库。补丁摘要仍固定验证。若将来的 Node 24 更新无法干净应用补丁，任务会明确失败，不忽略补丁错误。
 
-补丁仓库固定提交：`1086a0a7c6b7105f300a4af8724e6d996ce3c347`。
-
-工作流先验证源码提交、版本号和所有补丁摘要，再逐份执行 `git apply --check` / `git apply`。不使用模糊合并或忽略失败。更新 Node 版本时，需要重新移植和验证补丁，不能只改工作流里的版本字符串。
-
-## 编译与检查
-
-编译使用 [Node 官方 vcbuild](https://github.com/nodejs/node/blob/v24.22.1/vcbuild.bat)：
+使用官方 Windows 构建入口：
 
 ```bat
 vcbuild.bat x64 vs2022 clang-cl no-cctest msi
 ```
 
-`vcbuild` 默认就是 Release 配置。这里没有显式传 `release`，因为该参数还会开启 LTCG 和额外的 C++ 测试目标。没有传 `build-release` 或 `sign`，因此不需要官方签名证书。`msi` 参数同时生成完整的分发目录，随后用 7-Zip 将该目录压缩为 ZIP，省去额外的符号包。WiX 4 由上游 MSI 项目通过 NuGet 还原，不需要手工装 WiX 3。`DOTNET_ROLL_FORWARD=Major` 允许 WiX 构建工具使用 runner 的较新 .NET 运行库。
+默认采用 Release 配置，不启用额外 C++ 测试目标或官方签名流程。MSI 参数生成完整分发目录，随后用 7-Zip 打包；没有新增测试流程。
 
-构建在 `windows-2022` 上执行，MSI、ZIP 和 SHA-256 文件上传后，检查包括：
+GitHub 自动提供仓库范围的 `GITHUB_TOKEN`。版本检查任务只读；构建任务使用 `contents: write` 发布 Release，不需要额外保存个人访问令牌。
 
-- 验证 ZIP 结构、解压 ZIP，使用其中的 `node.exe` 执行测试。
-- 检查 PE 头的最低系统版本和一组已知 Win7 缺失 API 的普通/延迟导入，保留完整导入表。
-- 执行主机名、标题、计时、Unicode 文件、子进程、Worker、Atomics、DNS、加密、回环 TLS/HTTPS、Intl、SQLite 测试。
-- 使用包内的 `node.exe` 执行包内 npm、npx、Corepack CLI；不依赖 runner 自带的 Node。
-- 使用 `msiexec /a` 管理解包 MSI，比较 MSI 和 ZIP 的 `node.exe` 哈希，并重新测试 MSI 内的程序。
+## Win7 上使用
 
-**以上通过也不等于 Win7 兼容性已确认。** 导入表检查只覆盖已知问题，无法证明动态 API 调用和所有第三方原生扩展都兼容；`msiexec /a` 也不是实际安装测试。
+目标是 **Windows 7 SP1 x64**，运行时独立于 Electron/VxKex。先解压 ZIP，在 Win7 上执行 `node.exe -v`、`npm.cmd -v`，再运行实际项目。系统需要适用的运行库和更新；不要覆盖系统 DLL。
 
-MSI 保留了上游 Node 的安装目录、注册表路径和升级标识，以沿用单一 Node 安装行为。真机试装前请先处理已有 Node 安装；本包不会创建一个与官方 Node 隔离的第二套全局安装。
+MSI 沿用上游 Node 的安装目录和升级标识，安装前请处理已有 Node 安装。更完整的检查可以使用 artifact 附带的 `smoke.cjs` 和 `fixtures/`，其中私钥仅供本机回环 HTTPS 测试。
 
-## 在 Windows 7 上完成最终验证
-
-目标是 **Windows 7 SP1 x64**，不提供 x86 或 ARM64。系统应具备适用的 UCRT/运行库及 DLL 安全加载更新（如 KB2999226、KB2533623 或其替代更新）；是否需要补装取决于现有系统和实际报错。不要覆盖系统 DLL。
-
-先在 Win7 上解开构建 artifact，再将其中的 Node ZIP 也解压到同一目录。假设该目录是 `C:\node24-test`，用 CMD 执行：
-
-```bat
-cd /d C:\node24-test
-node-v24.22.1-win-x64\node.exe -v
-node-v24.22.1-win-x64\node.exe smoke.cjs
-node-v24.22.1-win-x64\npm.cmd -v
-```
-
-再测试实际项目，并在可回滚的 Win7 环境中验证 MSI 安装、PATH、启动和卸载：
-
-```bat
-msiexec /i node-v24.22.1-win7-x64.msi /L*v node24-win7-install.log
-```
-
-`fixtures/localhost-key.pem` 是测试专用的公开私钥，仅用于回环 HTTPS 测试。
-
-## 本次交付前的验证
-
-具体检查结果见 `VALIDATION.md`。本地环境无法完成 Windows 编译或 Win7 运行测试；这些状态也明确写入工作流的结果摘要和 `build-info.json`。
+本次交付和升级的历史验证记录见 `VALIDATION.md`。
