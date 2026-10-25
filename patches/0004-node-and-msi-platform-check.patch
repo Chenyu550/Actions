@@ -1,0 +1,49 @@
+diff --git a/src/node_main.cc b/src/node_main.cc
+--- a/src/node_main.cc
++++ b/src/node_main.cc
+@@ -32,16 +32,16 @@
+ #define SKIP_CHECK_STRLEN (sizeof(SKIP_CHECK_VALUE) - 1)
+ 
+ int wmain(int argc, wchar_t* wargv[]) {
+-  // Windows Server 2012 (not R2) is supported until 10/10/2023, so we allow it
+-  // to run in the experimental support tier.
++  // Unofficial Windows 7 SP1 backport; preserve the explicit override. This
++  // check alone does not establish compatibility of the runtime or addons.
+   char buf[SKIP_CHECK_STRLEN + 1];
+-  if (!IsWindows10OrGreater() &&
++  if (!IsWindows7SP1OrGreater() &&
+       (GetEnvironmentVariableA(SKIP_CHECK_VAR, buf, sizeof(buf)) !=
+            SKIP_CHECK_STRLEN ||
+        strncmp(buf, SKIP_CHECK_VALUE, SKIP_CHECK_STRLEN) != 0)) {
+     fprintf(stderr,
+-            "Node.js is only supported on Windows 10, Windows "
+-            "Server 2016, or higher.\n"
++            "This community build requires Windows 7 SP1 / Windows "
++            "Server 2008 R2 SP1 or higher.\n"
+             "Setting the " SKIP_CHECK_VAR " environment variable "
+             "to 1 skips this\ncheck, but Node.js might not execute "
+             "correctly. Any issues encountered on\nunsupported "
+diff --git a/tools/msvs/msi/nodemsi/product.wxs b/tools/msvs/msi/nodemsi/product.wxs
+--- a/tools/msvs/msi/nodemsi/product.wxs
++++ b/tools/msvs/msi/nodemsi/product.wxs
+@@ -2,9 +2,9 @@
+      xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util"
+      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+ 
+-  <?define ProductName = "Node.js" ?>
++  <?define ProductName = "Node.js (Windows 7 community build)" ?>
+   <?define ProductDescription = "Node.js" ?>
+-  <?define ProductAuthor = "Node.js Foundation" ?>
++  <?define ProductAuthor = "Community build" ?>
+ 
+   <?define RegistryKeyPath = "SOFTWARE\Node.js" ?>
+ 
+@@ -19,7 +19,7 @@
+            InstallerVersion="200"
+            Compressed="yes">
+ 
+-    <Launch Condition="Installed OR (VersionNT &gt;= 603) OR (VersionNT &gt;= 602 AND MsiNTProductType &lt;&gt; 1)" Message="This application is only supported on Windows 8.1, Windows Server 2012 R2, or higher." />
++    <Launch Condition="Installed OR (VersionNT &gt; 601) OR (VersionNT = 601 AND ServicePackLevel &gt;= 1)" Message="This community build requires Windows 7 SP1 / Windows Server 2008 R2 SP1 or higher." />
+ 
+     <Media Id="1" Cabinet="media1.cab" EmbedCab="yes"/>
+ 

@@ -1,0 +1,15 @@
+diff --git a/deps/v8/src/base/platform/platform-win32.cc b/deps/v8/src/base/platform/platform-win32.cc
+--- a/deps/v8/src/base/platform/platform-win32.cc
++++ b/deps/v8/src/base/platform/platform-win32.cc
+@@ -1215,6 +1215,11 @@
+       CreateWaitableTimerExW(NULL,  // Cannot be inherited by child processes
+                              NULL,  // Cannot be looked up by name
+                              flags, desired_access);
++  // Windows 7 does not accept CREATE_WAITABLE_TIMER_HIGH_RESOLUTION.
++  // Retry with a normal timer while preserving errors unrelated to the flag.
++  if (timer_ == NULL && GetLastError() == ERROR_INVALID_PARAMETER) {
++    timer_ = CreateWaitableTimerExW(NULL, NULL, 0, desired_access);
++  }
+ }
+ 
+ void PreciseSleepTimer::Sleep(TimeDelta interval) const {

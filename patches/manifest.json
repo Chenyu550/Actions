@@ -1,0 +1,33 @@
+{
+  "node_version": "24.20.0",
+  "node_commit": "71b8b174857e25106d39b61a9e6f30d927da8b01",
+  "upstream_patch_repository": "e3kskoy7wqk/Electron-for-windows-7",
+  "upstream_patch_commit": "1086a0a7c6b7105f300a4af8724e6d996ce3c347",
+  "patches": [
+    {
+      "file": "0001-libuv-hostname.patch",
+      "origin": "https://github.com/e3kskoy7wqk/Electron-for-windows-7/blob/1086a0a7c6b7105f300a4af8724e6d996ce3c347/v44.2.0/third_party/electron_node/fix_crash_caused_by_gethostnamew_on_windows_7.patch",
+      "sha256": "d0566ca3025b86ce94b915362d611b92d9c598f0d829134638348d8d8a843429"
+    },
+    {
+      "file": "0002-libuv-realtime-clock.patch",
+      "origin": "https://github.com/e3kskoy7wqk/Electron-for-windows-7/blob/1086a0a7c6b7105f300a4af8724e6d996ce3c347/v44.2.0/third_party/electron_node/FR_add_real-time_clock_version_of_uv_hrtime%28%29_%231674.diff",
+      "sha256": "227b5473a6cac33d322a55f4c45873d83123e7ebb0ae49c80083a90a243cbfe5"
+    },
+    {
+      "file": "0003-libuv-process-title.patch",
+      "origin": "https://github.com/e3kskoy7wqk/Electron-for-windows-7/blob/1086a0a7c6b7105f300a4af8724e6d996ce3c347/v44.2.0/third_party/electron_node/fix_crash_uv_get_process_title_on_windows_7.diff",
+      "sha256": "a7d8c39def788fb83a7901aaaeb76afd1dad11e7a74d0735631d710345bbef20"
+    },
+    {
+      "file": "0004-node-and-msi-platform-check.patch",
+      "origin": "Local supplemental patch: runtime/platform checks and MSI community-build branding.",
+      "sha256": "a93be5b39ec9bb596567f8483a40daf66f9ae26badf2f20c8a7356af7924639d"
+    },
+    {
+      "file": "0005-v8-waitable-timer-fallback.patch",
+      "origin": "Local supplemental patch: V8 normal-timer retry for unsupported high-resolution flag.",
+      "sha256": "6b00a985c70bdd72fe7b71a0fb3451fa2a5ea42d7f59c50c904897ac28389f3b"
+    }
+  ]
+}

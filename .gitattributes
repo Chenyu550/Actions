@@ -1,0 +1,8 @@
+*.py text eol=lf
+*.cjs text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.pem text eol=lf
+# Preserve upstream patch bytes; manifest SHA-256 hashes depend on them.
+*.patch -text

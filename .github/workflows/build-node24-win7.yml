@@ -1,0 +1,170 @@
+name: Build Node 24 for Windows 7 (experimental)
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/build-node24-win7.yml'
+      - 'patches/**'
+      - 'scripts/**'
+      - 'tests/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: node24-win7-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Node v24.20.0 / x64 / MSI + ZIP
+    runs-on: windows-2022
+    timeout-minutes: 360
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      NODE_VERSION: '24.20.0'
+      NODE_COMMIT: '71b8b174857e25106d39b61a9e6f30d927da8b01'
+      # WiX 4 tools target .NET 6; allow the runner's newer .NET runtime.
+      DOTNET_ROLL_FORWARD: Major
+      PYTHONUTF8: '1'
+
+    steps:
+      - name: Check out this build repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Check out the pinned official Node source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          repository: nodejs/node
+          ref: ${{ env.NODE_COMMIT }}
+          path: node-src
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Set up build Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Check build tools and install NASM if needed
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $vs = & $vswhere -latest -version '[17.14,18.0)' -products '*' `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+              Microsoft.VisualStudio.Component.VC.Llvm.Clang `
+              Microsoft.VisualStudio.Component.VC.Llvm.ClangToolset `
+            -property installationPath
+          if ($LASTEXITCODE -ne 0 -or -not $vs) {
+            throw 'VS 2022 17.14+, C++ tools, and VS ClangCL components are required.'
+          }
+          & "$vs\VC\Tools\Llvm\x64\bin\clang-cl.exe" --version
+          if ($LASTEXITCODE -ne 0) { throw 'ClangCL is unavailable.' }
+          if (-not (Get-Command nasm.exe -ErrorAction SilentlyContinue)) {
+            choco install nasm --yes --no-progress --limit-output
+            if ($LASTEXITCODE -ne 0) { throw 'NASM installation failed.' }
+          }
+          foreach ($dir in @("$env:ProgramFiles\NASM", "${env:ProgramFiles(x86)}\NASM")) {
+            if (Test-Path "$dir\nasm.exe") {
+              $env:PATH = "$dir;$env:PATH"
+              $dir | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+            }
+          }
+          if (-not (Get-Command 7z.exe -ErrorAction SilentlyContinue)) {
+            $env:PATH = "$env:ProgramFiles\7-Zip;$env:PATH"
+            "$env:ProgramFiles\7-Zip" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          }
+          nasm -v
+          if ($LASTEXITCODE -ne 0) { throw 'NASM is unavailable.' }
+          7z i | Select-Object -First 12
+          dotnet --list-sdks
+          if ($LASTEXITCODE -ne 0) { throw '.NET SDK is unavailable.' }
+          python -m pip install --disable-pip-version-check pefile==2024.8.26
+          if ($LASTEXITCODE -ne 0) { throw 'PE inspection dependency installation failed.' }
+          New-Item -ItemType Directory -Force reports | Out-Null
+
+      - name: Verify source and apply all five patches
+        run: |
+          python scripts/apply_patches.py --source node-src --report reports/build-info.json
+          if ($LASTEXITCODE -ne 0) { throw 'Patch verification/application failed.' }
+          git -C node-src diff --binary --output=../reports/applied.patch
+          if ($LASTEXITCODE -ne 0) { throw 'Could not record the applied source changes.' }
+
+      - name: Compile Node and create MSI
+        working-directory: node-src
+        shell: cmd
+        run: |
+          rem Release is vcbuild's default. The explicit "release" argument also
+          rem enables LTCG/cctest; omit it to avoid those unnecessary build costs.
+          rem Do not use "build-release": that enables official signing/upload paths.
+          call vcbuild.bat x64 vs2022 clang-cl no-cctest msi
+          exit /b %errorlevel%
+
+      - name: Zip the complete upstream staging directory
+        working-directory: node-src/Release
+        run: |
+          $folder = "node-v$env:NODE_VERSION-win-x64"
+          if (-not (Test-Path "$folder/node.exe")) { throw 'Staged Node payload is missing.' }
+          # The msi argument already stages the complete distributable tree.
+          # Archive that tree without vcbuild's extra PDB/7z symbol packages.
+          7z a -tzip -mx=7 "$folder.zip" "$folder"
+          if ($LASTEXITCODE -ne 0) { throw 'ZIP creation failed.' }
+
+      - name: Verify and test the packaged ZIP and MSI payloads
+        run: |
+          python scripts/verify_packages.py --source node-src --reports reports
+          if ($LASTEXITCODE -ne 0) { throw 'Package verification failed.' }
+
+      - name: Collect artifacts and SHA-256 checksums
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item "node-src/Release/node-v$env:NODE_VERSION-win-x64.zip" "dist/node-v$env:NODE_VERSION-win7-x64.zip"
+          Copy-Item "node-src/node-v$env:NODE_VERSION-x64.msi" "dist/node-v$env:NODE_VERSION-win7-x64.msi"
+          Copy-Item reports/build-info.json dist/
+          Copy-Item reports/applied.patch dist/
+          Copy-Item README.md dist/BUILD-README.md
+          Copy-Item VALIDATION.md dist/
+          Copy-Item scripts/smoke.cjs dist/
+          Copy-Item -Recurse tests/fixtures dist/fixtures
+          @('Experimental Windows 7 SP1 x64 community build.',
+            'CI runs on Windows Server 2022. Windows 7 runtime and MSI installation are NOT verified by this workflow.',
+            'Run node.exe smoke.cjs on a real Windows 7 SP1 x64 machine before relying on this build.') |
+            Set-Content dist/COMPATIBILITY.txt -Encoding utf8
+          Get-ChildItem dist -File | Sort-Object Name | ForEach-Object {
+            $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $($_.Name)"
+          } | Set-Content dist/SHASUMS256.txt -Encoding ascii
+          @('## Experimental Node v24.20.0 for Windows 7 SP1 x64',
+            '',
+            'Built: unsigned MSI installer and ZIP, with bundled npm/corepack.',
+            '',
+            'Validated: patches, known-incompatible PE imports, ZIP smoke tests, MSI administrative extraction, and MSI payload smoke tests.',
+            '',
+            '**Not validated: execution or MSI installation on Windows 7.** Download the artifacts and perform that final check on a real Win7 SP1 x64 machine.') |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
+
+      - name: Upload MSI, ZIP, and checksums
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: node-v24.20.0-win7-x64-experimental
+          path: dist/
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 30
+
+      - name: Upload build reports, including on failure
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: node24-win7-reports
+          path: |
+            reports/
+            node-src/.used_configure_flags
+          if-no-files-found: ignore
+          retention-days: 30
