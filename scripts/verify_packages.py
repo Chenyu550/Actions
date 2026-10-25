@@ -32,7 +32,12 @@ def check_payload(executable: Path, label: str, reports: Path, version: str) -> 
     if actual != 'v' + version:
         raise RuntimeError(f'Unexpected packaged version: {actual}')
     audit(executable, reports / f'{label}-imports.json')
-    for name in ['npm.cmd', 'npx.cmd', 'corepack.cmd', 'LICENSE']:
+    required_files = ['npm.cmd', 'npx.cmd', 'corepack.cmd']
+    # WiX embeds license.rtf in LicenseAgreementDlg; MSI does not install
+    # the ZIP distribution's standalone LICENSE file.
+    if label == 'zip':
+        required_files.append('LICENSE')
+    for name in required_files:
         if not (folder / name).is_file():
             raise RuntimeError(f'Missing packaged file: {folder / name}')
     run_logged([str(executable), str(ROOT / 'scripts/smoke.cjs')],

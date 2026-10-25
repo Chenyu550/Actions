@@ -6,7 +6,7 @@
 
 ## 下载编译结果
 
-运行成功后，在该次 Actions 页的 **Artifacts** 下载 `node-v24.20.0-win7-x64-experimental`。解开 artifact 后得到：
+安装包上传完成后，在该次 Actions 页的 **Artifacts** 下载 `node-v24.20.0-win7-x64-experimental`。工作流先编译打包并上传，再进行程序与包内容校验；无需等待校验结束，后续校验失败也可以下载。解开 artifact 后得到：
 
 | 文件 | 用途 |
 | --- | --- |
@@ -17,7 +17,7 @@
 | `smoke.cjs`、`fixtures/` | 可在 Win7 上再次运行的功能测试 |
 | `COMPATIBILITY.txt` | 当前验证范围 |
 
-另一个 artifact `node24-win7-reports` 保存导入表、测试输出、MSI 解包日志；检查失败时也会上传已有报告。没有自动创建 GitHub Release。
+另一个 artifact `node24-win7-reports` 保存导入表、测试输出、MSI 解包日志；检查失败时也会上传已有报告。安装包提前上传并不代表验证通过，请同时查看运行结果。没有自动创建 GitHub Release。
 
 ZIP 内的目录沿用上游名称 `node-v24.20.0-win-x64`。程序报告的版本仍是 `v24.20.0`，未修改 Node 模块 ABI，也未替换 V8、OpenSSL 等依赖的版本。
 
@@ -49,7 +49,7 @@ vcbuild.bat x64 vs2022 clang-cl no-cctest msi
 
 `vcbuild` 默认就是 Release 配置。这里没有显式传 `release`，因为该参数还会开启 LTCG 和额外的 C++ 测试目标。没有传 `build-release` 或 `sign`，因此不需要官方签名证书。`msi` 参数同时生成完整的分发目录，随后用 7-Zip 将该目录压缩为 ZIP，省去额外的符号包。WiX 4 由上游 MSI 项目通过 NuGet 还原，不需要手工装 WiX 3。`DOTNET_ROLL_FORWARD=Major` 允许 WiX 构建工具使用 runner 的较新 .NET 运行库。
 
-构建在 `windows-2022` 上执行，检查包括：
+构建在 `windows-2022` 上执行，MSI、ZIP 和 SHA-256 文件上传后，检查包括：
 
 - 验证 ZIP 结构、解压 ZIP，使用其中的 `node.exe` 执行测试。
 - 检查 PE 头的最低系统版本和一组已知 Win7 缺失 API 的普通/延迟导入，保留完整导入表。

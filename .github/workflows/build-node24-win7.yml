@@ -115,11 +115,6 @@ jobs:
           7z a -tzip -mx=7 "$folder.zip" "$folder"
           if ($LASTEXITCODE -ne 0) { throw 'ZIP creation failed.' }
 
-      - name: Verify and test the packaged ZIP and MSI payloads
-        run: |
-          python scripts/verify_packages.py --source node-src --reports reports
-          if ($LASTEXITCODE -ne 0) { throw 'Package verification failed.' }
-
       - name: Collect artifacts and SHA-256 checksums
         run: |
           $ErrorActionPreference = 'Stop'
@@ -133,6 +128,7 @@ jobs:
           Copy-Item scripts/smoke.cjs dist/
           Copy-Item -Recurse tests/fixtures dist/fixtures
           @('Experimental Windows 7 SP1 x64 community build.',
+            'Packages are uploaded before verification. Check the workflow result and reports for verification status.',
             'CI runs on Windows Server 2022. Windows 7 runtime and MSI installation are NOT verified by this workflow.',
             'Run node.exe smoke.cjs on a real Windows 7 SP1 x64 machine before relying on this build.') |
             Set-Content dist/COMPATIBILITY.txt -Encoding utf8
@@ -144,7 +140,7 @@ jobs:
             '',
             'Built: unsigned MSI installer and ZIP, with bundled npm/corepack.',
             '',
-            'Validated: patches, known-incompatible PE imports, ZIP smoke tests, MSI administrative extraction, and MSI payload smoke tests.',
+            'Packages are uploaded before verification. The verification step and reports below show the subsequent check results.',
             '',
             '**Not validated: execution or MSI installation on Windows 7.** Download the artifacts and perform that final check on a real Win7 SP1 x64 machine.') |
             Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
@@ -157,6 +153,13 @@ jobs:
           if-no-files-found: error
           compression-level: 0
           retention-days: 30
+
+      - name: Verify the uploaded ZIP and MSI payloads
+        run: |
+          python scripts/verify_packages.py --source node-src --reports reports
+          if ($LASTEXITCODE -ne 0) { throw 'Package verification failed. MSI and ZIP remain available in the uploaded artifact.' }
+          'Package verification passed on the Windows 2022 build host.' |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append
 
       - name: Upload build reports, including on failure
         if: always()
