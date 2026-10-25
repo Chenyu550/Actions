@@ -158,13 +158,11 @@ def publish(repository: str, token: str, version: str, directory: Path) -> None:
         raise RuntimeError('An unrelated draft release already uses this tag; leaving it unchanged.')
 
     run_url = f'https://github.com/{repository}/actions/runs/{os.environ["GITHUB_RUN_ID"]}'
-    title = f'Node.js v{version} for Windows 7 x64'
-    notes = (f'{MARKER}\nUnofficial Windows 7 SP1 x64 build of Node.js v{version}.\n\n'
+    title = f'{version}'
+    notes = (f'{MARKER}\nWindows 7 build of Node.js v{version}.\n\n'
              f'- Official Node source commit: `{source}`\n'
              '- Includes the MSI installer, portable ZIP, and SHA-256 checksums.\n'
-             f'- [Build and subsequent verification results]({run_url})\n\n'
-             'Packages are published before runtime/package verification. '
-             'Windows 7 real-machine compatibility has not been verified.')
+             f'- Build [results]({run_url})')
     if release is None:
         release = request_json(f'{API}{base}', token=token, method='POST', payload={
             'tag_name': version, 'target_commitish': target, 'name': title,

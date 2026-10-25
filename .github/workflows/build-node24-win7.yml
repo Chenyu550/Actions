@@ -5,13 +5,6 @@ on:
     # 01:00 UTC = 09:00 Asia/Singapore, once per day.
     - cron: '0 1 * * *'
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/build-node24-win7.yml'
-      - 'patches/**'
-      - 'scripts/**'
-      - 'tests/**'
 
 permissions:
   contents: read
