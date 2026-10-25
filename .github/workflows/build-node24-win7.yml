@@ -18,15 +18,15 @@ concurrency:
 
 jobs:
   build:
-    name: Node v24.20.0 / x64 / MSI + ZIP
+    name: Node v24.22.1 / x64 / MSI + ZIP
     runs-on: windows-2022
     timeout-minutes: 360
     defaults:
       run:
         shell: pwsh
     env:
-      NODE_VERSION: '24.20.0'
-      NODE_COMMIT: '71b8b174857e25106d39b61a9e6f30d927da8b01'
+      NODE_VERSION: '24.22.1'
+      NODE_COMMIT: 'ce7aaf1cee78b8cf0ce17364260535c418d3ed26'
       # WiX 4 tools target .NET 6; allow the runner's newer .NET runtime.
       DOTNET_ROLL_FORWARD: Major
       PYTHONUTF8: '1'
@@ -136,7 +136,7 @@ jobs:
             $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
             "$hash  $($_.Name)"
           } | Set-Content dist/SHASUMS256.txt -Encoding ascii
-          @('## Experimental Node v24.20.0 for Windows 7 SP1 x64',
+          @('## Experimental Node v24.22.1 for Windows 7 SP1 x64',
             '',
             'Built: unsigned MSI installer and ZIP, with bundled npm/corepack.',
             '',
@@ -148,7 +148,7 @@ jobs:
       - name: Upload MSI, ZIP, and checksums
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: node-v24.20.0-win7-x64-experimental
+          name: node-v24.22.1-win7-x64-experimental
           path: dist/
           if-no-files-found: error
           compression-level: 0

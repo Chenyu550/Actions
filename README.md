@@ -1,4 +1,4 @@
-# Node.js v24.20.0：Windows 7 SP1 x64 实验构建
+# Node.js v24.22.1：Windows 7 SP1 x64 实验构建
 
 把本包**全部内容**放进你自己的 GitHub 仓库根目录，保留隐藏的 `.github` 目录，然后进入 **Actions → Build Node 24 for Windows 7 (experimental) → Run workflow**。
 
@@ -6,12 +6,12 @@
 
 ## 下载编译结果
 
-安装包上传完成后，在该次 Actions 页的 **Artifacts** 下载 `node-v24.20.0-win7-x64-experimental`。工作流先编译打包并上传，再进行程序与包内容校验；无需等待校验结束，后续校验失败也可以下载。解开 artifact 后得到：
+安装包上传完成后，在该次 Actions 页的 **Artifacts** 下载 `node-v24.22.1-win7-x64-experimental`。工作流先编译打包并上传，再进行程序与包内容校验；无需等待校验结束，后续校验失败也可以下载。解开 artifact 后得到：
 
 | 文件 | 用途 |
 | --- | --- |
-| `node-v24.20.0-win7-x64.msi` | 未签名的 x64 安装包，包含 npm、npx、Corepack 和安装界面 |
-| `node-v24.20.0-win7-x64.zip` | 便携包，包含 `node.exe`、npm、npx、Corepack 和许可证 |
+| `node-v24.22.1-win7-x64.msi` | 未签名的 x64 安装包，包含 npm、npx、Corepack 和安装界面 |
+| `node-v24.22.1-win7-x64.zip` | 便携包，包含 `node.exe`、npm、npx、Corepack 和许可证 |
 | `SHASUMS256.txt` | 顶层文件的 SHA-256 校验值 |
 | `build-info.json`、`applied.patch` | 固定源码/补丁版本、校验值和实际应用的源码改动 |
 | `smoke.cjs`、`fixtures/` | 可在 Win7 上再次运行的功能测试 |
@@ -19,7 +19,7 @@
 
 另一个 artifact `node24-win7-reports` 保存导入表、测试输出、MSI 解包日志；检查失败时也会上传已有报告。安装包提前上传并不代表验证通过，请同时查看运行结果。没有自动创建 GitHub Release。
 
-ZIP 内的目录沿用上游名称 `node-v24.20.0-win-x64`。程序报告的版本仍是 `v24.20.0`，未修改 Node 模块 ABI，也未替换 V8、OpenSSL 等依赖的版本。
+ZIP 内的目录沿用上游名称 `node-v24.22.1-win-x64`。程序报告的版本仍是 `v24.22.1`，未修改 Node 模块 ABI，也未替换 V8、OpenSSL 等依赖的版本。
 
 ## 实际应用的补丁
 
@@ -33,7 +33,7 @@ ZIP 内的目录沿用上游名称 `node-v24.20.0-win-x64`。程序报告的版�
 | `0004-node-and-msi-platform-check.patch` | 将 Node 启动检查和 MSI 安装条件改为 Win7 SP1 起，标明社区构建 |
 | `0005-v8-waitable-timer-fallback.patch` | 高精度计时器标志不受支持时，重试普通计时器 |
 
-Node 来源：[nodejs/node v24.20.0](https://github.com/nodejs/node/tree/v24.20.0)，固定提交 `71b8b174857e25106d39b61a9e6f30d927da8b01`。
+Node 来源：[nodejs/node v24.22.1](https://github.com/nodejs/node/tree/v24.22.1)，固定提交 `ce7aaf1cee78b8cf0ce17364260535c418d3ed26`。
 
 补丁仓库固定提交：`1086a0a7c6b7105f300a4af8724e6d996ce3c347`。
 
@@ -41,7 +41,7 @@ Node 来源：[nodejs/node v24.20.0](https://github.com/nodejs/node/tree/v24.20.
 
 ## 编译与检查
 
-编译使用 [Node 官方 vcbuild](https://github.com/nodejs/node/blob/v24.20.0/vcbuild.bat)：
+编译使用 [Node 官方 vcbuild](https://github.com/nodejs/node/blob/v24.22.1/vcbuild.bat)：
 
 ```bat
 vcbuild.bat x64 vs2022 clang-cl no-cctest msi
@@ -69,15 +69,15 @@ MSI 保留了上游 Node 的安装目录、注册表路径和升级标识，以�
 
 ```bat
 cd /d C:\node24-test
-node-v24.20.0-win-x64\node.exe -v
-node-v24.20.0-win-x64\node.exe smoke.cjs
-node-v24.20.0-win-x64\npm.cmd -v
+node-v24.22.1-win-x64\node.exe -v
+node-v24.22.1-win-x64\node.exe smoke.cjs
+node-v24.22.1-win-x64\npm.cmd -v
 ```
 
 再测试实际项目，并在可回滚的 Win7 环境中验证 MSI 安装、PATH、启动和卸载：
 
 ```bat
-msiexec /i node-v24.20.0-win7-x64.msi /L*v node24-win7-install.log
+msiexec /i node-v24.22.1-win7-x64.msi /L*v node24-win7-install.log
 ```
 
 `fixtures/localhost-key.pem` 是测试专用的公开私钥，仅用于回环 HTTPS 测试。

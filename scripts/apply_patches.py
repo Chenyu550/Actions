@@ -62,7 +62,7 @@ def main() -> None:
         'windows_7_tested': False,
         'signing': 'unsigned community build',
         'command': 'vcbuild.bat x64 vs2022 clang-cl no-cctest msi',
-        'zip': '7z a -tzip -mx=7 node-v24.20.0-win-x64.zip node-v24.20.0-win-x64',
+        'zip': f'7z a -tzip -mx=7 node-v{version}-win-x64.zip node-v{version}-win-x64',
     })
     args.report.parent.mkdir(parents=True, exist_ok=True)
     args.report.write_text(json.dumps(report, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')

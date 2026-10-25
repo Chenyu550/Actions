@@ -1,6 +1,6 @@
 {
-  "node_version": "24.20.0",
-  "node_commit": "71b8b174857e25106d39b61a9e6f30d927da8b01",
+  "node_version": "24.22.1",
+  "node_commit": "ce7aaf1cee78b8cf0ce17364260535c418d3ed26",
   "upstream_patch_repository": "e3kskoy7wqk/Electron-for-windows-7",
   "upstream_patch_commit": "1086a0a7c6b7105f300a4af8724e6d996ce3c347",
   "patches": [
